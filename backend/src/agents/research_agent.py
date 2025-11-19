@@ -73,9 +73,11 @@ class ResearchAgent(BaseCustomAgent):
             all_results: List[SearchResult] = []
             step_count = len(research_plan.search_steps)
             
+            self.log_step(f"🔍 Starting research with {step_count} search steps...")
+            
             # Execute each search step
             for idx, step in enumerate(research_plan.search_steps):
-                self.log_step(f"Executing step {idx + 1}/{step_count}: {step.description}")
+                self.log_step(f"🔎 Executing step {idx + 1}/{step_count}: {step.description}")
                 
                 # Execute searches for this step
                 step_results = await self._execute_search_step(
@@ -84,11 +86,13 @@ class ResearchAgent(BaseCustomAgent):
                     step=step
                 )
                 
+                self.log_step(f"✓ Found {len(step_results)} results for step {idx + 1}")
                 all_results.extend(step_results)
             
             # Analyze and score all results
-            self.log_step("Analyzing result relevance")
+            self.log_step(f"📊 Analyzing relevance of {len(all_results)} total results...")
             scored_results = await self._score_results(query.content, all_results)
+            self.log_step("✓ Relevance analysis complete")
             
             # Sort by relevance score (descending)
             scored_results.sort(key=lambda r: r.relevance_score, reverse=True)

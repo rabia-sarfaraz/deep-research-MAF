@@ -72,23 +72,26 @@ class ContentWritingAgent(BaseCustomAgent):
                 raise ValueError("No search results available for synthesis")
             
             # Step 1: Prepare sources and citations
-            self.log_step("Preparing sources")
+            self.log_step("📚 Preparing sources and citations...")
             sources = self._prepare_sources(search_results)
+            self.log_step(f"✓ Prepared {len(sources)} sources")
             
             # Step 2: Generate answer content
-            self.log_step("Generating answer content")
+            self.log_step("✍️ Generating comprehensive answer content...")
             answer_content = await self._generate_content(
                 query.content,
                 search_results,
                 sources
             )
+            self.log_step(f"✓ Generated {len(answer_content)} characters of content")
             
             # Step 3: Structure answer into sections
-            self.log_step("Structuring answer")
+            self.log_step("📑 Structuring answer into sections...")
             sections = self._create_sections(answer_content, sources)
+            self.log_step(f"✓ Created {len(sections)} sections")
             
             # Step 4: Generate metadata
-            self.log_step("Finalizing answer")
+            self.log_step("✅ Finalizing answer with metadata...")
             metadata = self._create_metadata(search_results, answer_content)
             
             # Create synthesized answer

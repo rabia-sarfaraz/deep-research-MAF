@@ -113,6 +113,154 @@ class ResearchWorkflow:
             .build()
         )
     
+    async def execute_query_stream(
+        self,
+        query_content: str,
+        search_sources: List[str]
+    ):
+        """
+        Execute the complete research workflow with streaming updates.
+        
+        Args:
+            query_content: The research question
+            search_sources: List of search sources to use
+            
+        Yields:
+            Dict events with agent status and results
+        """
+        try:
+            # Prepare query
+            from ..models.query import ResearchQuery
+            from ..models import SearchSource
+            
+            source_enums = []
+            for src in search_sources:
+                if isinstance(src, SearchSource):
+                    source_enums.append(src)
+                elif isinstance(src, str):
+                    clean_src = src.replace('SearchSource.', '').lower()
+                    try:
+                        source_enums.append(SearchSource(clean_src))
+                    except ValueError:
+                        logger.warning(f"Invalid search source: {src}, skipping")
+                        continue
+            
+            if not source_enums:
+                source_enums = [SearchSource.GOOGLE]
+            
+            query = ResearchQuery(
+                content=query_content,
+                search_sources=source_enums
+            )
+            
+            # Initialize shared state
+            self._shared_state.clear()
+            self._shared_state["query"] = query
+            self._shared_state["search_sources"] = source_enums
+            
+            # Agent names in order
+            agent_names = [
+                "Planning Agent",
+                "Research Agent",
+                "Reflect Agent",
+                "Content Writing Agent"
+            ]
+            
+            current_agent_idx = 0
+            
+            # Send start event
+            yield {
+                "type": "workflow_start",
+                "query": query_content
+            }
+            
+            # Run workflow and stream events
+            async for event in self.workflow.run_stream(query_content):
+                event_type = type(event).__name__
+                
+                # Agent started thinking
+                if event_type == 'ExecutorStartedEvent':
+                    if current_agent_idx < len(agent_names):
+                        agent_name = agent_names[current_agent_idx]
+                        yield {
+                            "type": "agent_start",
+                            "agent": agent_name,
+                            "status": "thinking"
+                        }
+                
+                # Agent completed
+                elif event_type == 'ExecutorCompletedEvent':
+                    if current_agent_idx < len(agent_names):
+                        agent_name = agent_names[current_agent_idx]
+                        result_data = getattr(event, 'data', None)
+                        
+                        yield {
+                            "type": "agent_complete",
+                            "agent": agent_name,
+                            "status": "completed"
+                        }
+                        
+                        current_agent_idx += 1
+                        
+                        # Store result in shared state
+                        if agent_name == "Planning Agent" and result_data:
+                            plan = getattr(result_data, 'research_plan', None)
+                            if plan:
+                                yield {
+                                    "type": "plan_created",
+                                    "plan": plan.model_dump() if hasattr(plan, 'model_dump') else str(plan)
+                                }
+                        
+                        elif agent_name == "Research Agent" and result_data:
+                            results = getattr(result_data, 'search_results', [])
+                            if results:
+                                yield {
+                                    "type": "research_complete",
+                                    "results_count": len(results)
+                                }
+            
+            # Get final answer from shared state
+            synthesized_answer = self._shared_state.get("synthesized_answer")
+            if synthesized_answer:
+                # Stream answer character by character
+                content = synthesized_answer.content if hasattr(synthesized_answer, 'content') else str(synthesized_answer)
+                
+                yield {
+                    "type": "answer_start"
+                }
+                
+                # Stream in chunks for better performance
+                chunk_size = 5
+                for i in range(0, len(content), chunk_size):
+                    chunk = content[i:i+chunk_size]
+                    yield {
+                        "type": "answer_chunk",
+                        "content": chunk
+                    }
+                    # Small delay for streaming effect
+                    import asyncio
+                    await asyncio.sleep(0.01)
+                
+                # Send complete answer with metadata
+                yield {
+                    "type": "answer_complete",
+                    "answer": synthesized_answer.model_dump() if hasattr(synthesized_answer, 'model_dump') else {"content": content},
+                    "research_plan": self._shared_state.get("research_plan").model_dump() if self._shared_state.get("research_plan") and hasattr(self._shared_state.get("research_plan"), 'model_dump') else None,
+                    "search_results": [r.model_dump() if hasattr(r, 'model_dump') else r for r in self._shared_state.get("search_results", [])]
+                }
+            
+            # Send completion event
+            yield {
+                "type": "workflow_complete"
+            }
+            
+        except Exception as e:
+            logger.error(f"Streaming workflow error: {e}", exc_info=True)
+            yield {
+                "type": "error",
+                "message": str(e)
+            }
+    
     async def execute_query(
         self,
         query_content: str,

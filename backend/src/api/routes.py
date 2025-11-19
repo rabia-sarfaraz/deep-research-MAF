@@ -1,9 +1,11 @@
 """FastAPI routes for Deep Research Agent API."""
 
+import json
 import logging
 from typing import List
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from ..models import SearchSource
@@ -158,7 +160,60 @@ async def submit_research(request: ResearchRequest) -> ResearchResponse:
         )
 
 
-
+@router.post("/research/stream", status_code=status.HTTP_200_OK)
+async def submit_research_stream(request: ResearchRequest):
+    """
+    Submit a research query and stream results in real-time using SSE.
+    
+    This executes the multi-agent workflow and streams:
+    - Agent status updates (thinking, processing)
+    - Character-by-character answer streaming
+    - Final results
+    
+    Args:
+        request: Research request with question and sources
+        
+    Returns:
+        SSE stream with agent updates and results
+        
+    Raises:
+        HTTPException: If validation or workflow execution fails
+    """
+    async def event_generator():
+        try:
+            logger.info(f"Starting streaming research for: {request.content[:50]}...")
+            
+            # Create workflow instance
+            workflow = ResearchWorkflow()
+            
+            # Execute workflow with streaming
+            async for event in workflow.execute_query_stream(
+                query_content=request.content,
+                search_sources=[str(src) for src in request.search_sources]
+            ):
+                # Send event as SSE
+                event_data = json.dumps(event, ensure_ascii=False)
+                yield f"data: {event_data}\n\n"
+            
+            logger.info("Streaming research completed")
+            
+        except Exception as e:
+            logger.error(f"Streaming research failed: {e}", exc_info=True)
+            error_event = {
+                "type": "error",
+                "message": str(e)
+            }
+            yield f"data: {json.dumps(error_event)}\n\n"
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
+    )
 
 
 # Export router

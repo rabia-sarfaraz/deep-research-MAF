@@ -78,19 +78,22 @@ class PlanningAgent(BaseCustomAgent):
             query_id = str(query.id)
             
             # Step 1: Generate keywords
-            self.log_step("Generating search keywords")
+            self.log_step("🔍 Analyzing query and generating search keywords...")
             keywords = await self._generate_keywords(query_content)
+            self.log_step(f"✓ Generated {len(keywords)} keywords")
             
             # Step 2: Determine sources
-            self.log_step("Determining search sources")
+            self.log_step("🎯 Determining optimal search sources...")
             sources = await self._determine_sources(query_content, keywords)
+            self.log_step(f"✓ Selected sources: {', '.join([s.value for s in sources])}")
             
             # Step 3: Create search steps
-            self.log_step("Creating search strategy")
+            self.log_step("📋 Creating detailed search strategy...")
             search_steps = await self._create_search_steps(query_content, keywords, sources)
+            self.log_step(f"✓ Created {len(search_steps)} search steps")
             
             # Step 4: Create research plan
-            self.log_step("Finalizing research plan")
+            self.log_step("✅ Finalizing comprehensive research plan...")
             research_plan = ResearchPlan(
                 query_id=query_id,
                 strategy=await self._generate_strategy_summary(query_content, search_steps),

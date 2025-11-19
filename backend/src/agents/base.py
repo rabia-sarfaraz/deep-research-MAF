@@ -117,7 +117,7 @@ class BaseCustomAgent(BaseAgent):
         **kwargs
     ):
         """
-        Streaming version of run - delegates to run() for simplicity.
+        Streaming version of run with status updates.
         
         Args:
             messages: Input messages (string or list of ChatMessage)
@@ -125,18 +125,27 @@ class BaseCustomAgent(BaseAgent):
             **kwargs: Additional keyword arguments
             
         Yields:
-            AgentRunResponseUpdate with result from run() method
+            AgentRunResponseUpdate with status and result
         """
         from agent_framework import AgentRunResponseUpdate
         
         logger.debug(f"{self.agent_id.value}: run_stream called")
         
+        # Yield thinking status
+        yield AgentRunResponseUpdate(
+            text=f"{self.name} is thinking...",
+            author_name=self.name,
+            role="assistant",
+            additional_properties={"status": "thinking"}
+        )
+        
+        # Execute the agent logic
         result = await self.run(messages=messages, thread=thread, **kwargs)
         
         # Convert result to AgentRunResponseUpdate
-        # The result from execute() is a dict with agent-specific data
         result_text = str(result) if result else "No result"
         
+        # Yield final result
         yield AgentRunResponseUpdate(
             text=result_text,
             author_name=self.name,

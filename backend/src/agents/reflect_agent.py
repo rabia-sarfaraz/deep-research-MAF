@@ -70,24 +70,27 @@ class ReflectAgent(BaseCustomAgent):
                 }
             
             # Step 1: Analyze result quality
-            self.log_step("Analyzing result quality")
+            self.log_step("🔍 Analyzing quality of collected results...")
             quality_analysis = await self._analyze_quality(search_results)
+            self.log_step("✓ Quality analysis complete")
             
             # Step 2: Check topic coverage
-            self.log_step("Checking topic coverage")
+            self.log_step("🎯 Checking topic coverage and completeness...")
             coverage_analysis = await self._analyze_coverage(
                 query.content,
                 research_plan.keywords,
                 search_results
             )
+            self.log_step("✓ Coverage analysis complete")
             
             # Step 3: Generate recommendations
-            self.log_step("Generating recommendations")
+            self.log_step("💡 Generating recommendations for synthesis...")
             recommendations = await self._generate_recommendations(
                 query.content,
                 quality_analysis,
                 coverage_analysis
             )
+            self.log_step("✓ Recommendations generated")
             
             # Calculate overall completeness score
             completeness_score = self._calculate_completeness_score(
@@ -97,6 +100,8 @@ class ReflectAgent(BaseCustomAgent):
             
             # Determine if sufficient for synthesis
             is_sufficient = completeness_score >= 0.6 and len(search_results) >= 3
+            
+            self.log_step(f"✅ Analysis complete. Completeness: {completeness_score:.1%}, Sufficient: {is_sufficient}")
             
             # Store feedback in shared state
             feedback_data = {
