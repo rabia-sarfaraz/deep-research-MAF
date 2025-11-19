@@ -68,7 +68,7 @@ class PlanningAgent(BaseCustomAgent):
                 # Create a new query object with default sources
                 query = ResearchQuery(
                     content=task_content,
-                    search_sources=[SearchSource.GOOGLE]  # Default, will be updated if needed
+                    search_sources=[SearchSource.ARXIV]  # Default, will be updated if needed
                 )
                 
                 # Store in shared state for other agents
@@ -167,12 +167,12 @@ class PlanningAgent(BaseCustomAgent):
             for indicator in academic_indicators
         )
         
-        # Default: search both sources
-        sources = [SearchSource.GOOGLE]
+        # Default: search arXiv
+        sources = [SearchSource.ARXIV]
         
-        # Add arXiv for academic queries
-        if is_academic:
-            sources.append(SearchSource.ARXIV)
+        # Add Google for non-academic queries
+        if not is_academic:
+            sources.append(SearchSource.GOOGLE)
         
         return sources
     

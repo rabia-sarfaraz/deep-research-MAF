@@ -19,10 +19,10 @@ async def test_streaming_research(
     
     Args:
         query: Research question
-        sources: List of search sources (default: ["google"])
+        sources: List of search sources (default: ["arxiv"])
     """
     if sources is None:
-        sources = ["google"]
+        sources = ["arxiv"]
     
     url = "http://localhost:8000/research/stream"
     
@@ -119,11 +119,11 @@ async def main():
     if len(sys.argv) < 2:
         print("Usage: python test_streaming.py '<research query>' [sources...]")
         print("\nExample:")
-        print("  python test_streaming.py 'What is quantum computing?' google arxiv")
+        print("  python test_streaming.py 'What is quantum computing?' arxiv google")
         sys.exit(1)
     
     query = sys.argv[1]
-    sources = sys.argv[2:] if len(sys.argv) > 2 else ["google"]
+    sources = sys.argv[2:] if len(sys.argv) > 2 else ["arxiv"]
     
     try:
         await test_streaming_research(query, sources)

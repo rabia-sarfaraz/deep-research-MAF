@@ -2,7 +2,9 @@
 
 import json
 import logging
+from datetime import datetime
 from typing import List
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -15,6 +17,16 @@ from ..workflows.group_chat import ResearchWorkflow
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)  # Ensure INFO level is enabled
+
+# Custom JSON encoder for UUID and datetime
+class CustomJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder for UUID and datetime objects."""
+    def default(self, obj):
+        if isinstance(obj, UUID):
+            return str(obj)
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 # Router instance
 router = APIRouter()
@@ -192,7 +204,7 @@ async def submit_research_stream(request: ResearchRequest):
                 search_sources=[str(src) for src in request.search_sources]
             ):
                 # Send event as SSE
-                event_data = json.dumps(event, ensure_ascii=False)
+                event_data = json.dumps(event, ensure_ascii=False, cls=CustomJSONEncoder)
                 yield f"data: {event_data}\n\n"
             
             logger.info("Streaming research completed")

@@ -15,7 +15,7 @@ from agent_framework import (
     GroupChatBuilder,
     GroupChatStateSnapshot,
     AgentRunUpdateEvent,
-    WorkflowOutputEvent
+    WorkflowOutputEvent,
 )
 
 from ..agents.planning_agent import PlanningAgent
@@ -146,7 +146,7 @@ class ResearchWorkflow:
                         continue
             
             if not source_enums:
-                source_enums = [SearchSource.GOOGLE]
+                source_enums = [SearchSource.ARXIV]
             
             query = ResearchQuery(
                 content=query_content,
@@ -208,7 +208,7 @@ class ResearchWorkflow:
                             if plan:
                                 yield {
                                     "type": "plan_created",
-                                    "plan": plan.model_dump() if hasattr(plan, 'model_dump') else str(plan)
+                                    "plan": plan.model_dump(mode='json') if hasattr(plan, 'model_dump') else str(plan)
                                 }
                         
                         elif agent_name == "Research Agent" and result_data:
@@ -244,9 +244,9 @@ class ResearchWorkflow:
                 # Send complete answer with metadata
                 yield {
                     "type": "answer_complete",
-                    "answer": synthesized_answer.model_dump() if hasattr(synthesized_answer, 'model_dump') else {"content": content},
-                    "research_plan": self._shared_state.get("research_plan").model_dump() if self._shared_state.get("research_plan") and hasattr(self._shared_state.get("research_plan"), 'model_dump') else None,
-                    "search_results": [r.model_dump() if hasattr(r, 'model_dump') else r for r in self._shared_state.get("search_results", [])]
+                    "answer": synthesized_answer.model_dump(mode='json') if hasattr(synthesized_answer, 'model_dump') else {"content": content},
+                    "research_plan": self._shared_state.get("research_plan").model_dump(mode='json') if self._shared_state.get("research_plan") and hasattr(self._shared_state.get("research_plan"), 'model_dump') else None,
+                    "search_results": [r.model_dump(mode='json') if hasattr(r, 'model_dump') else r for r in self._shared_state.get("search_results", [])]
                 }
             
             # Send completion event
@@ -307,7 +307,7 @@ class ResearchWorkflow:
                         continue
             
             if not source_enums:
-                source_enums = [SearchSource.GOOGLE]  # Default fallback
+                source_enums = [SearchSource.ARXIV]  # Default fallback
             
             query = ResearchQuery(
                 content=query_content,
