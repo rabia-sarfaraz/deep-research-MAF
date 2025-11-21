@@ -21,8 +21,8 @@ Microsoft Agent Framework 기반의 AI 리서치 에이전트 시스템으로, �
 
 ```bash
 cd backend
-pip install -e .
-python -m src.main
+uv sync
+uv run python -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 서버는 `http://localhost:8000`에서 실행됩니다.
