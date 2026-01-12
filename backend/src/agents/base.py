@@ -180,12 +180,27 @@ class BaseCustomAgent(BaseAgent):
     
     def log_step(self, step_description: str) -> None:
         """
-        Log a step in the agent's execution.
+        Log a step in the agent's execution and emit event for streaming.
         
         Args:
             step_description: Description of the current step
         """
         logger.info(f"{self.agent_id.value}: {step_description}")
+        
+        # Emit event for streaming to frontend
+        import asyncio
+        try:
+            # Try to get the running event loop
+            loop = asyncio.get_running_loop()
+            # Create a task to emit the event
+            loop.create_task(self.emit_event({
+                "type": "agent_step",
+                "agent": self.agent_id.value,
+                "step": step_description
+            }))
+        except RuntimeError:
+            # No event loop running (sync context), skip streaming
+            pass
 
     async def emit_event(self, event: Dict[str, Any]) -> None:
         """Emit a real-time event into the workflow stream (if enabled).
