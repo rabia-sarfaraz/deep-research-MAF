@@ -232,8 +232,14 @@ class BingGroundingSearchService:
                 finally:
                     try:
                         self.client.agents.delete_version(agent.name, agent.version)
-                    except Exception:
-                        pass
+                    except Exception as cleanup_exc:
+                        logger.warning(
+                            "Failed to delete BingSearchAgent version %s for agent %s: %s",
+                            agent.version,
+                            agent.name,
+                            cleanup_exc,
+                            exc_info=True,
+                        )
             except Exception as e:
                 logger.error("Bing Grounding Search error: %s", str(e), exc_info=True)
                 raise Exception(f"Bing Grounding Search error: {str(e)}") from e
