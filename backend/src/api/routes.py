@@ -44,6 +44,7 @@ class ResearchRequest(BaseModel):
     """Request body for research query."""
     content: str = Field(..., min_length=1, max_length=2000, description="Research question text")
     search_sources: List[SearchSource] = Field(..., min_length=1, description="Search sources to use")
+    thread_id: str | None = Field(None, description="Optional thread ID for multi-turn conversation")
 
 
 class ResearchResponse(BaseModel):
@@ -201,14 +202,17 @@ async def submit_research_stream(request: ResearchRequest):
     async def event_generator():
         try:
             logger.info(f"Starting streaming research for: {request.content[:50]}...")
+            if request.thread_id:
+                logger.info(f"Using thread_id: {request.thread_id}")
             
             # Create workflow instance
             workflow = ResearchWorkflow()
             
-            # Execute workflow with streaming
+            # Execute workflow with streaming and thread support
             async for event in workflow.execute_query_stream(
                 query_content=request.content,
-                search_sources=[str(src) for src in request.search_sources]
+                search_sources=[str(src) for src in request.search_sources],
+                thread_id=request.thread_id
             ):
                 # Send event as SSE
                 event_data = json.dumps(event, ensure_ascii=False, cls=CustomJSONEncoder)

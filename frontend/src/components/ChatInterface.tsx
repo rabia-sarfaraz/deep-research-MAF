@@ -11,6 +11,7 @@ export function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [searchEvents, setSearchEvents] = useState<SearchEvent[]>([]);
+  const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -65,10 +66,15 @@ export function ChatInterface() {
       for await (const event of streamResearch({
         content: userMessage.content,
         search_sources: ['google', 'arxiv', 'duckduckgo', 'bing'],
+        thread_id: threadId,
       })) {
         switch (event.type) {
           case 'workflow_start':
             setStatusMessage('🚀 Starting research workflow...');
+            // Store thread_id from server response
+            if (event.thread_id) {
+              setThreadId(event.thread_id);
+            }
             break;
           
           case 'agent_start':
@@ -198,18 +204,39 @@ export function ChatInterface() {
     }
   };
 
+  const handleNewConversation = () => {
+    setMessages([]);
+    setThreadId(undefined);
+    setSearchEvents([]);
+    setStatusMessage('');
+    setInput('');
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-        <div className="max-w-5xl mx-auto flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
-            <span className="text-white text-xl font-bold">🔍</span>
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+              <span className="text-white text-xl font-bold">🔍</span>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Deep Researcher</h1>
+              <p className="text-sm text-gray-500">AI-powered research assistant</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Deep Researcher</h1>
-            <p className="text-sm text-gray-500">AI-powered research assistant</p>
-          </div>
+          {messages.length > 0 && (
+            <button
+              onClick={handleNewConversation}
+              className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg 
+                         hover:from-purple-600 hover:to-blue-600 transition-all duration-200 
+                         flex items-center gap-2 text-sm font-medium shadow-sm"
+            >
+              <span>✨</span>
+              New Conversation
+            </button>
+          )}
         </div>
       </header>
 

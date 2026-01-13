@@ -57,7 +57,13 @@ class ResearchAgent(BaseCustomAgent):
         super().__init__(
             agent_id=AgentId.RESEARCH,
             agent_name="Research Agent",
-            agent_description="Executes searches and collects relevant information"
+            agent_description="Executes searches and collects relevant information",
+            instructions="""You are a Research Agent. Your role is to:
+1. Execute research plans from the Planning Agent
+2. Perform searches across multiple sources (Google, arXiv, DuckDuckGo, Bing)
+3. Collect and organize search results
+4. Analyze relevance of each result
+5. Store high-quality results for synthesis"""
         )
         
         # Check which search services to enable via environment variables

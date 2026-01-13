@@ -65,9 +65,11 @@ export interface StreamEvent {
     }>;
   };
   message?: string;
+  thread_id?: string;  // Thread ID for multi-turn conversation
 }
 
 export interface ResearchRequest {
   content: string;
   search_sources: string[];
+  thread_id?: string;  // Optional thread ID for multi-turn conversation
 }

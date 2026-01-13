@@ -36,7 +36,13 @@ class ReflectAgent(BaseCustomAgent):
         super().__init__(
             agent_id=AgentId.REFLECT,
             agent_name="Reflect Agent",
-            agent_description="Analyzes research completeness and suggests improvements"
+            agent_description="Analyzes research completeness and suggests improvements",
+            instructions="""You are a Reflect Agent. Your role is to:
+1. Review collected search results for quality
+2. Analyze coverage of the research question
+3. Identify gaps in information
+4. Assess answer readiness
+5. Provide feedback and recommendations for content synthesis"""
         )
         self.openai_service = AzureOpenAIService()
     

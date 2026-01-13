@@ -36,7 +36,13 @@ class PlanningAgent(BaseCustomAgent):
         super().__init__(
             agent_id=AgentId.PLANNING,
             agent_name="Planning Agent",
-            agent_description="Analyzes research questions and creates search strategies"
+            agent_description="Analyzes research questions and creates search strategies",
+            instructions="""You are a Research Planning Agent. Your role is to:
+1. Analyze user research questions thoroughly
+2. Generate relevant search keywords
+3. Create structured research plans with multiple search steps
+4. Determine optimal search sources (Google, arXiv, DuckDuckGo, Bing)
+5. Estimate research time and complexity"""
         )
         self.openai_service = AzureOpenAIService()
     

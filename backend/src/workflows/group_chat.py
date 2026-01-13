@@ -6,10 +6,16 @@ This workflow uses GroupChatBuilder to orchestrate agents in sequence:
 2. Research Agent - Executes searches
 3. Reflect Agent - Analyzes completeness
 4. Content Writing Agent - Synthesizes answer
+
+Thread Management:
+- Supports multi-turn conversations via AgentThread
+- Each workflow session can have a persistent thread_id
+- Thread state can be serialized/deserialized for persistence
 """
 
 import logging
 from typing import Any, Dict, Optional, Callable, List
+import uuid
 
 import asyncio
 
@@ -18,6 +24,7 @@ from agent_framework import (
     GroupChatStateSnapshot,
     AgentRunUpdateEvent,
     WorkflowOutputEvent,
+    AgentThread,
 )
 
 from ..agents.planning_agent import PlanningAgent
@@ -72,10 +79,18 @@ class ResearchWorkflow:
     2. Research Agent - Executes searches
     3. Reflect Agent - Analyzes completeness
     4. Content Writing Agent - Synthesizes answer
+    
+    Thread Management:
+    - Supports persistent conversation threads via AgentThread
+    - Thread state can be serialized/deserialized for storage
+    - Enables multi-turn research conversations
     """
     
     # Class-level shared state that agents can access
     _shared_state: Dict[str, Any] = {}
+    
+    # Thread storage for multi-turn conversations
+    _thread_store: Dict[str, AgentThread] = {}
     
     def __init__(
         self,
@@ -115,10 +130,94 @@ class ResearchWorkflow:
             .build()
         )
     
+    def get_or_create_thread(self, thread_id: Optional[str] = None) -> tuple[str, AgentThread]:
+        """
+        Get existing thread or create a new one.
+        
+        Args:
+            thread_id: Optional existing thread ID
+            
+        Returns:
+            Tuple of (thread_id, AgentThread)
+        """
+        if thread_id and thread_id in self._thread_store:
+            logger.info(f"Resuming existing thread: {thread_id}")
+            return thread_id, self._thread_store[thread_id]
+        
+        # Create new thread
+        new_thread_id = thread_id or str(uuid.uuid4())
+        new_thread = AgentThread()
+        self._thread_store[new_thread_id] = new_thread
+        logger.info(f"Created new thread: {new_thread_id}")
+        return new_thread_id, new_thread
+    
+    def serialize_thread(self, thread_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Serialize thread state for persistence.
+        
+        Args:
+            thread_id: Thread ID to serialize
+            
+        Returns:
+            Serialized thread state or None if not found
+        """
+        if thread_id not in self._thread_store:
+            return None
+        
+        thread = self._thread_store[thread_id]
+        return {
+            "thread_id": thread_id,
+            "state": thread.serialize() if hasattr(thread, 'serialize') else {}
+        }
+    
+    @classmethod
+    def deserialize_thread(cls, data: Dict[str, Any]) -> Optional[tuple[str, AgentThread]]:
+        """
+        Deserialize thread state from storage.
+        
+        Args:
+            data: Serialized thread data
+            
+        Returns:
+            Tuple of (thread_id, AgentThread) or None if invalid
+        """
+        if not data or "thread_id" not in data:
+            return None
+        
+        thread_id = data["thread_id"]
+        
+        if hasattr(AgentThread, 'deserialize'):
+            thread = AgentThread.deserialize(data.get("state", {}))
+        else:
+            thread = AgentThread()
+        
+        cls._thread_store[thread_id] = thread
+        return thread_id, thread
+    
+    def list_threads(self) -> List[str]:
+        """Return list of all active thread IDs."""
+        return list(self._thread_store.keys())
+    
+    def delete_thread(self, thread_id: str) -> bool:
+        """
+        Delete a thread from storage.
+        
+        Args:
+            thread_id: Thread ID to delete
+            
+        Returns:
+            True if deleted, False if not found
+        """
+        if thread_id in self._thread_store:
+            del self._thread_store[thread_id]
+            return True
+        return False
+    
     async def execute_query_stream(
         self,
         query_content: str,
-        search_sources: List[str]
+        search_sources: List[str],
+        thread_id: Optional[str] = None
     ):
         """
         Execute the complete research workflow with streaming updates.
@@ -126,11 +225,15 @@ class ResearchWorkflow:
         Args:
             query_content: The research question
             search_sources: List of search sources to use
+            thread_id: Optional thread ID for multi-turn conversation
             
         Yields:
             Dict events with agent status and results
         """
         try:
+            # Get or create thread for this conversation
+            current_thread_id, thread = self.get_or_create_thread(thread_id)
+            
             # Prepare query
             from ..models.query import ResearchQuery
             from ..models import SearchSource
@@ -159,6 +262,8 @@ class ResearchWorkflow:
             self._shared_state.clear()
             self._shared_state["query"] = query
             self._shared_state["search_sources"] = source_enums
+            self._shared_state["thread_id"] = current_thread_id
+            self._shared_state["thread"] = thread
 
             # Queue for real-time streaming events emitted by agents
             event_queue: asyncio.Queue = asyncio.Queue()
@@ -174,10 +279,11 @@ class ResearchWorkflow:
             
             current_agent_idx = 0
             
-            # Push start event
+            # Push start event with thread_id
             await event_queue.put({
                 "type": "workflow_start",
                 "query": query_content,
+                "thread_id": current_thread_id,
             })
 
             async def _run_group_chat() -> None:
@@ -274,12 +380,14 @@ class ResearchWorkflow:
                     "type": "answer_complete",
                     "answer": synthesized_answer.model_dump(mode='json') if hasattr(synthesized_answer, 'model_dump') else {"content": content},
                     "research_plan": self._shared_state.get("research_plan").model_dump(mode='json') if self._shared_state.get("research_plan") and hasattr(self._shared_state.get("research_plan"), 'model_dump') else None,
-                    "search_results": [r.model_dump(mode='json') if hasattr(r, 'model_dump') else r for r in self._shared_state.get("search_results", [])]
+                    "search_results": [r.model_dump(mode='json') if hasattr(r, 'model_dump') else r for r in self._shared_state.get("search_results", [])],
+                    "thread_id": current_thread_id
                 }
             
-            # Send completion event
+            # Send completion event with thread_id
             yield {
-                "type": "workflow_complete"
+                "type": "workflow_complete",
+                "thread_id": current_thread_id
             }
             
         except Exception as e:

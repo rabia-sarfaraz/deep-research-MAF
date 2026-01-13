@@ -45,7 +45,13 @@ class ContentWritingAgent(BaseCustomAgent):
         super().__init__(
             agent_id=AgentId.CONTENT,
             agent_name="Content Writing Agent",
-            agent_description="Synthesizes comprehensive answers with citations"
+            agent_description="Synthesizes comprehensive answers with citations",
+            instructions="""You are a Content Writing Agent. Your role is to:
+1. Synthesize information from search results into comprehensive answers
+2. Structure content with clear sections and headings
+3. Add proper source citations using [number] notation
+4. Write in a clear, informative Markdown style
+5. Generate answer metadata and statistics"""
         )
         self.openai_service = AzureOpenAIService()
     
