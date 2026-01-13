@@ -14,13 +14,17 @@ from .api.routes import router
 # Load environment variables from .env file
 load_dotenv()
 
+# Get log level from environment variable, default to DEBUG for development
+log_level = os.getenv("LOG_LEVEL", "DEBUG").upper()
+
 # Setup basic logging with more detailed format
 logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s - %(name)s:%(lineno)d - %(levelname)s] %(message)s',
+    level=getattr(logging, log_level),
+    format='[%(asctime)s - %(filename)s:%(lineno)d - %(levelname)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger(__name__)
+logger.info(f"Logging level set to: {log_level}")
 
 
 @asynccontextmanager

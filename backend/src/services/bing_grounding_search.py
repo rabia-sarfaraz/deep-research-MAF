@@ -1,6 +1,7 @@
 """Bing Grounding Search service using Azure AI Projects."""
 
 import asyncio
+import logging
 import os
 from typing import List, Optional
 
@@ -14,6 +15,8 @@ from azure.identity import DefaultAzureCredential
 
 from ..models.search_result import SearchResult
 from ..models import SearchSource, UUID
+
+logger = logging.getLogger(__name__)
 
 
 class BingGroundingSearchService:
@@ -87,6 +90,7 @@ class BingGroundingSearchService:
             Exception: If search fails
         """
         def _run_sync() -> List[SearchResult]:
+            logger.info(f"Starting Bing search for query: {query}")
             try:
                 bing_tool = BingGroundingAgentTool(
                     bing_grounding=BingGroundingSearchToolParameters(
@@ -118,49 +122,57 @@ class BingGroundingSearchService:
                         extra_body={"agent": {"name": agent.name, "type": "agent_reference"}},
                         tool_choice="required",
                     )
-
+                    
                     search_results: List[SearchResult] = []
 
-                    if hasattr(response, "output_items"):
-                        for item in response.output_items:
-                            if item.type == "message" and item.content:
+                    # Parse response.output
+                    if hasattr(response, "output") and response.output:
+                        for item in response.output:
+                            # Look for message type with content
+                            if item.type == "message" and hasattr(item, 'content') and item.content:
                                 for content_block in item.content:
-                                    if content_block.type == "output_text" and hasattr(
-                                        content_block, "annotations"
-                                    ):
+                                    # Check if it's output_text type with annotations
+                                    if content_block.type == "output_text" and hasattr(content_block, "annotations"):
                                         for annotation in content_block.annotations:
                                             if annotation.type == "url_citation":
+                                                title = annotation.title if hasattr(annotation, "title") else ""
+                                                url = annotation.url if hasattr(annotation, "url") else ""
+                                                snippet = content_block.text[:500] if hasattr(content_block, "text") else ""
+                                                
                                                 search_results.append(
                                                     SearchResult(
                                                         query_id=query_id,
                                                         source=SearchSource.BING,
-                                                        title=annotation.title
-                                                        if hasattr(annotation, "title")
-                                                        else "",
-                                                        url=annotation.url,
-                                                        snippet=content_block.text[:500]
-                                                        if hasattr(content_block, "text")
-                                                        else "",
+                                                        title=title,
+                                                        url=url,
+                                                        snippet=snippet,
                                                     )
                                                 )
+                    else:
+                        logger.warning("Response does not have output attribute or output is empty")
 
+                    if len(search_results) == 0:
+                        logger.warning(f"No search results found for query: {query}")
+                    else:
+                        logger.info(f"Found {len(search_results)} results from Bing")
                     return search_results[:num_results]
                 finally:
                     try:
                         self.client.agents.delete_version(agent.name, agent.version)
-                    except Exception:
-                        pass
+                    except Exception as cleanup_error:
+                        logger.warning(f"Agent cleanup failed: {cleanup_error}")
             except Exception as e:
+                logger.error(f"Bing Grounding Search error: {str(e)}", exc_info=True)
                 raise Exception(f"Bing Grounding Search error: {str(e)}") from e
 
         try:
             return await asyncio.wait_for(
                 asyncio.to_thread(_run_sync),
-                timeout=30.0  
+                timeout=60.0  # Increased from 30s to 60s for slower Bing API responses
             )
         except asyncio.TimeoutError:
-            logger.error("Bing Grounding Search timeout after 30 seconds for query: %s", query)
-            raise Exception("Bing Grounding Search timeout after 30 seconds")
+            logger.error("Bing Grounding Search timeout after 60 seconds for query: %s", query)
+            raise Exception("Bing Grounding Search timeout after 60 seconds")
     
     async def search_with_keywords(
         self,
